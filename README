@@ -1,0 +1,11 @@
+
+1.    Look in PCI configuration space to find the Base Address Register (BAR) for the memory controller device.  You can do this with "setpci -s 0:0.0 0x48.l" (run as root).  This will give you a 32-bit physical address in Memory-Mapped IO space that maps to the memory controller.
+  2.  Double-check the address against the mappings given by "cat /proc/iomem".
+    In a program run by the root user, execute an mmap() function on /dev/mem at the offset specified above.  This will return a pointer to a virtual address that will point to that memory-mapped IO range.  I recommend assigning this pointer to an array of "uint32_t".
+   3. Read the initial value of the DRAM_DATA_READS counter by accessing array element 0x5050/4 = 0x1414 = 5140 (decimal).  If you simply assign that array value to a scalar the compiler should generate a 32-bit load operation, which is the only memory access type that will give you the correct answer for 32-bit fields in Memory-Mapped IO regions.
+   4.  Read the initial value DRAM_DATA_WRITES counter by accessing array element 0x5054/4=0x1415 = 5141 (decimal).
+ 5.   Optionally read the DRAM_GT_REQUESTS, DRAM_IA_REQUESTS, and DRAM_IO_REQUESTS using the same approach.   Read the documentation on the monitoring-integrated-memory-controller web page very carefully so that you understand what these mean.
+ 6.   At intervals of 10 seconds or less, read the counters again, compute the differences, correct for overflow (if applicable), and add the increments into 64-bit integers.  A background process that executes a ten-second "sleep()" call should be safe -- under realistic conditions the counters won't wrap in under 11-12 seconds, so the small amount of uncertainty in the wakeup time from the "sleep()" call is OK.
+   7. Repeat step 6 until your workload is completed.    My code includes a signal handler to accept the "SIGCONT" signal from user space that I send when the workload is completed (using "kill -SIGCONT pid_of_monitoring_program") since SIGCONT is the only signal that a process owned by root will accept from a non-root user process.  (Be careful of using signal numbers, the SIGCONT signal is assigned to different numerical values in different Linux versions.)
+
+
